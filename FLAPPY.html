@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #70c5ce;
+        }
+        #container {
+            position: relative;
+            width: 300px;
+            height: 400px;
+            background-color: #3a3a3a;
+            overflow: hidden;
+        }
+        #bird {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background-color: #f70d1a;
+        }
+        .pipe {
+            position: absolute;
+            width: 50px;
+            background-color: #2ecc71;
+        }
+        .pipe-top {
+            top: 0;
+        }
+        .pipe-bottom {
+            bottom: 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="bird"></div>
+        <button id="startButton">Start Game</button>
+        <div id="score" style="position: absolute; top: 10px; right: 10px; color: white;">Score: 0</div>
+        <div id="highScore" style="position: absolute; top: 30px; right: 10px; color: white;">High Score: 0</div>
+    </div>
+    <script>
+        const bird = document.getElementById('bird');
+        const container = document.getElementById('container');
+        const startButton = document.getElementById('startButton');
+        const scoreDisplay = document.getElementById('score');
+        const highScoreDisplay = document.getElementById('highScore'); 
+        const gravity = 2;
+        let birdPosition = 200;
+        let pipes = [];
+        let gameInterval;
+        let pipeSpacing = 300;
+        let score = 0;
+        let highScore = 0; 
+
+        
+        function updateHighScore() {
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('highScore', highScore); 
+                highScoreDisplay.textContent = `High Score: ${highScore}`;
+            }
+        }
+
+        
+        highScore = localStorage.getItem('highScore') || 0;
+        highScoreDisplay.textContent = `High Score: ${highScore}`;
+
+        startButton.addEventListener('click', startGame);
+
+        function startGame() {
+            startButton.style.display = 'none';
+            createPipes();
+            score = 0;
+            scoreDisplay.textContent = 'Score: 0';
+            gameInterval = setInterval(moveGameElements, 20);
+        }
+
+        document.addEventListener('keydown', jump);
+
+        function jump(event) {
+            if (event.keyCode === 32) {
+                birdPosition -= 50;
+            }
+        }
+
+        function createPipes() {
+            pipes.forEach(pipePair => {
+                pipePair.top.remove();
+                pipePair.bottom.remove();
+            });
+            pipes = [];
+
+            for (let i = 0; i < 5; i++) {
+                const pipeTop = document.createElement('div');
+                pipeTop.classList.add('pipe', 'pipe-top');
+                container.appendChild(pipeTop);
+                const pipeBottom = document.createElement('div');
+                pipeBottom.classList.add('pipe', 'pipe-bottom');
+                container.appendChild(pipeBottom);
+                const height = Math.floor(Math.random() * 200) + 50;
+                const topPosition = Math.floor(Math.random() * (200 - height)) + 50;
+                pipeTop.style.left = (i * pipeSpacing + 400) + 'px';
+                pipeBottom.style.left = (i * pipeSpacing + 400) + 'px';
+                pipeTop.style.height = topPosition + 'px';
+                pipeBottom.style.height = 300 - height - topPosition + 'px';
+                pipes.push({ top: pipeTop, bottom: pipeBottom, passed: false });
+            }
+        }
+
+        function moveGameElements() {
+            birdPosition += gravity;
+            bird.style.top = birdPosition + 'px';
+
+            pipes.forEach(pipePair => {
+                pipePair.top.style.left = (parseInt(pipePair.top.style.left) - 5) + 'px';
+                pipePair.bottom.style.left = (parseInt(pipePair.bottom.style.left) - 5) + 'px';
+
+                if (parseInt(pipePair.top.style.left) < -50) {
+                    const height = Math.floor(Math.random() * 200) + 50;
+                    const topPosition = Math.floor(Math.random() * (200 - height)) + 50;
+                    pipePair.top.style.left = (pipeSpacing * 4) + 'px';
+                    pipePair.bottom.style.left = (pipeSpacing * 4) + 'px';
+                    pipePair.top.style.height = topPosition + 'px';
+                    pipePair.bottom.style.height = 300 - height - topPosition + 'px';
+                    pipePair.passed = false; 
+                }
+
+                if (birdPosition > 400 || birdPosition < 0) {
+                    endGame();
+                }
+            });
+
+            if (checkCollision()) {
+                endGame();
+            }
+
+            pipes.forEach(pipePair => {
+                const birdRight = birdPosition + bird.clientWidth;
+                const pipeLeft = parseInt(pipePair.top.style.left);
+                if (birdRight > pipeLeft && !pipePair.passed) {
+                    pipePair.passed = true;
+                    incrementScore();
+                }
+            });
+        }
+
+        function checkCollision() {
+            const birdRect = bird.getBoundingClientRect();
+
+            for (const pipePair of pipes) {
+                const pipeTopRect = pipePair.top.getBoundingClientRect();
+                const pipeBottomRect = pipePair.bottom.getBoundingClientRect();
+
+                if (
+                    birdRect.right > pipeTopRect.left &&
+                    birdRect.left < pipeTopRect.right &&
+                    birdRect.bottom > pipeTopRect.top &&
+                    birdRect.top < pipeTopRect.bottom
+                ) {
+                    return true;
+                }
+
+                if (
+                    birdRect.right > pipeBottomRect.left &&
+                    birdRect.left < pipeBottomRect.right &&
+                    birdRect.bottom > pipeBottomRect.top &&
+                    birdRect.top < pipeBottomRect.bottom
+                ) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        function incrementScore() {
+            score += 10;
+            const scoreElement = document.getElementById('score');
+            scoreElement.textContent = `Score: ${score}`;
+        }
+
+        function endGame() {
+            clearInterval(gameInterval);
+            alert('Game over! Refresh the page to play again.');
+            startButton.style.display = 'block';
+            birdPosition = 200;
+            bird.style.top = birdPosition + 'px';
+            createPipes(); 
+            updateHighScore(); 
+            score = 0;
+            scoreDisplay.textContent = 'Score: ' + score;
+        }
+    </script>
+</body>
+</html>
